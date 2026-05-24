@@ -420,7 +420,7 @@ body.repo-select-mode .select-bar{display:flex}
 /* Always show hamburger when sidebar is hidden (logged out or mobile) */
 @media(max-width:640px){.hamburger{display:flex!important;align-items:center;justify-content:center}}
 /* ── SIDEBAR OVERLAY ─────────────────────────────────── */
-.sidebar-overlay{display:none;position:fixed;top:54px;right:0;bottom:0;left:265px;background:rgba(0,0,0,0.45);z-index:181}
+.sidebar-overlay{display:none;position:fixed;top:54px;right:0;bottom:0;left:220px;background:rgba(0,0,0,0.45);z-index:189}
 .sidebar-overlay.open{display:block}
 /* ── LARGE DESKTOP TUNING ──────────────────────────── */
 @media(min-width:1200px){
@@ -523,7 +523,7 @@ body.repo-select-mode .select-bar{display:flex}
     <div class="logo" onclick="navTo('dashboard')">
       <div class="logo-icon">🚀</div>
       <span class="logo-text">GitPush</span>
-      <span class="logo-v">V9</span>
+      <span class="logo-v">V11</span>
     </div>
     <div class="hdr-right">
       <button class="hamburger" id="hamburger-btn" onclick="toggleMobileSidebar()" aria-label="Toggle navigation" style="display:flex">☰</button>
@@ -651,7 +651,7 @@ body.repo-select-mode .select-bar{display:flex}
               <div class="info-box">
                 🔒 Token only sent to GitHub API — never stored on any server.<br><br>
                 Required scopes: <code>repo</code> · <code>workflow</code> · <code>delete_repo</code> · <code>notifications</code><br><br>
-                <a href="https://github.com/settings/tokens/new?scopes=repo,workflow,delete_repo,notifications&description=GitPush+V9" target="_blank" rel="noopener noreferrer" style="color:var(--accent)">→ Create token on GitHub</a>
+                <a href="https://github.com/settings/tokens/new?scopes=repo,workflow,delete_repo,notifications&description=GitPush+V11" target="_blank" rel="noopener noreferrer" style="color:var(--accent)">→ Create token on GitHub</a>
               </div>
             </div>
           </div>
@@ -933,7 +933,7 @@ body.repo-select-mode .select-bar{display:flex}
           </div>
           <div style="padding:8px 14px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px">
             <span style="font-size:11px;color:var(--lo)" id="editor-stats">0 lines · 0 chars</span>
-            <span style="font-size:11px;color:var(--amber)" id="editor-unsaved"></span>
+            <span style="font-size:11px;color:var(--amber);display:none" id="editor-unsaved"></span>
             <div style="flex:1"></div>
             <label style="font-size:12px;color:var(--mid);display:flex;align-items:center;gap:6px;cursor:pointer;margin:0;text-transform:none!important;letter-spacing:0">
               <input type="checkbox" id="editor-wrap" onchange="toggleEditorWrap()" style="width:auto;padding:0"/> Word wrap
@@ -1815,7 +1815,7 @@ async function gh(method,path,body,extraHeaders,_retry=0){
       return gh(method,path,body,extraHeaders,_retry+1);
     }
   }
-  if(r.status===204) return null;
+  if(r.status===204||r.status===205) return null;
   let d=null;try{d=await r.json();}catch(_){}
   if(!r.ok) throw new Error(d?.message||'GitHub API error '+r.status);
   return d;
@@ -2329,7 +2329,7 @@ async function execBulkDelete(){
   for(const full of list){
     document.getElementById('bulk-del-prog-txt').textContent=(done+1)+'/'+total+': '+full;
     document.getElementById('bulk-del-prog-file').textContent=full;
-    const pct=Math.round((done/total)*100);
+    const pct=Math.round(((done+1)/total)*100);
     document.getElementById('bulk-del-prog-pct').textContent=pct+'%';
     document.getElementById('bulk-del-prog-fill').style.width=pct+'%';
     try{
@@ -2763,7 +2763,7 @@ async function startUpload(){
   try{
     let baseSha=null,baseTreeSha=null;
     try{
-      const ref=await gh('GET','/repos/'+owner+'/'+repo+'/git/ref/heads/'+branch);
+      const ref=await gh('GET','/repos/'+owner+'/'+repo+'/git/refs/heads/'+branch);
       baseSha=ref.object.sha;
       const commit=await gh('GET','/repos/'+owner+'/'+repo+'/git/commits/'+baseSha);
       baseTreeSha=commit.tree.sha;
@@ -3010,7 +3010,7 @@ async function startMultiRepoUpload(){
       } else {
         let baseSha=null,baseTreeSha=null;
         try{
-          const ref=await gh('GET','/repos/'+owner+'/'+repo+'/git/ref/heads/'+rs.branch);
+          const ref=await gh('GET','/repos/'+owner+'/'+repo+'/git/refs/heads/'+rs.branch);
           baseSha=ref.object.sha;
           const commit=await gh('GET','/repos/'+owner+'/'+repo+'/git/commits/'+baseSha);
           baseTreeSha=commit.tree.sha;
@@ -3052,7 +3052,7 @@ async function startMultiRepoUpload(){
             const nt=await gh('POST','/repos/'+owner+'/'+repo+'/git/trees',{base_tree:cumTree,tree:treeItems.slice(i,i+CHUNK)});
             cumTree=nt.sha;
           }
-          if(S._uploadCancelled) return;
+          if(S._uploadCancelled){rs.status='failed';renderRow(rs);doneRepos++;setOverallProg();return;}
           const nc=await gh('POST','/repos/'+owner+'/'+repo+'/git/commits',{message:msg,tree:cumTree,parents:baseSha?[baseSha]:[]});
           await gh('PATCH','/repos/'+owner+'/'+repo+'/git/refs/heads/'+rs.branch,{sha:nc.sha,force:false});
         }
@@ -3108,7 +3108,7 @@ function showUploadResult(res,full,branch,dryRun){
   el.innerHTML=`
   ${dryRun?'<div class="warn-box" style="margin-bottom:10px">⚠️ Dry run — no actual changes made</div>':''}
   <div class="card"><div class="card-body">
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px">
+    <div class="stats-grid" style="gap:8px;margin-bottom:12px">
       <div class="stat-card"><div class="stat-num" style="color:var(--green)">${res.uploaded+res.renamed}</div><div class="stat-lbl">Uploaded</div></div>
       <div class="stat-card"><div class="stat-num" style="color:var(--accent)">${res.renamed}</div><div class="stat-lbl">Renamed</div></div>
       <div class="stat-card"><div class="stat-num" style="color:var(--amber)">${res.skipped}</div><div class="stat-lbl">Skipped</div></div>
@@ -3308,6 +3308,7 @@ async function editFmFile(path,sha){
 }
 
 async function downloadFmFile(url,name){
+  if(!url||!url.startsWith('https://')) return;
   const a=document.createElement('a');
   a.href=url;a.download=name;a.rel='noopener';
   document.body.appendChild(a);a.click();
@@ -3327,7 +3328,7 @@ async function deleteFmFolder(path){
   if(!confirm(`Delete folder "${path}" and ALL its contents?\nThis cannot be undone.`)) return;
   try{
     // First resolve branch ref → commit SHA → tree SHA (fix: was incorrectly using branch name as tree SHA)
-    const ref=await gh('GET','/repos/'+fmRepo+'/git/ref/heads/'+fmBranch);
+    const ref=await gh('GET','/repos/'+fmRepo+'/git/refs/heads/'+fmBranch);
     const baseSha=ref.object.sha;
     const commit=await gh('GET','/repos/'+fmRepo+'/git/commits/'+baseSha);
     const tree=await gh('GET','/repos/'+fmRepo+'/git/trees/'+commit.tree.sha+'?recursive=1');
@@ -3503,7 +3504,7 @@ async function saveEditorFile(){
     const payload={message:msg,content:strToB64(content),branch};
     if(shaIsValid) payload.sha=editorFileSha;
     const d=await gh('PUT','/repos/'+full+'/contents/'+encPath(path),payload);
-    editorFileSha=d.content.sha;editorDirty=false;
+    editorFileSha=d?.content?.sha||editorFileSha;editorDirty=false;
     editorFilePath=currentKey;
     const unsavedEl=document.getElementById('editor-unsaved');
     if(unsavedEl){unsavedEl.textContent='';unsavedEl.style.display='none';}
@@ -3659,7 +3660,7 @@ async function createBranch(){
   const from=document.getElementById('cb-from').value;
   if(!name){document.getElementById('cb-err').style.display='block';document.getElementById('cb-err').textContent='Branch name required';return;}
   try{
-    const ref=await gh('GET','/repos/'+full+'/git/ref/heads/'+from);
+    const ref=await gh('GET','/repos/'+full+'/git/refs/heads/'+from);
     await gh('POST','/repos/'+full+'/git/refs',{ref:'refs/heads/'+name,sha:ref.object.sha});
     toast('Branch "'+name+'" created ✅','success');
     closeModal('modal-create-branch');
@@ -3708,7 +3709,7 @@ async function loadReleases(){
             ${r.draft?'<span class="badge badge-gray" style="margin-left:5px">Draft</span>':''}
             ${r.prerelease?'<span class="badge badge-amber" style="margin-left:5px">Pre-release</span>':''}
           </div>
-          <div style="font-size:12px;color:var(--lo);margin-bottom:6px">🏷️ ${esc(r.tag_name)} · ${timeAgo(r.created_at)} · by ${esc(r.author.login)}</div>
+          <div style="font-size:12px;color:var(--lo);margin-bottom:6px">🏷️ ${esc(r.tag_name)} · ${timeAgo(r.created_at)} · by ${esc(r.author?.login||'unknown')}</div>
           ${r.body?`<div style="font-size:12px;color:var(--mid);line-height:1.5;white-space:pre-wrap;max-height:60px;overflow:hidden">${esc(r.body.slice(0,200))}${r.body.length>200?'…':''}</div>`:''}
         </div>
         <div style="display:flex;gap:5px;flex-shrink:0">
@@ -3885,6 +3886,7 @@ async function reopenIssue(full,num){
 // ── ACTIONS ───────────────────────────────────────────────────────
 let workflows=[];
 async function loadWorkflows(){
+  if(S.runsTimer){clearInterval(S.runsTimer);S.runsTimer=null;}
   const full=document.getElementById('actions-repo').value;
   const list=document.getElementById('workflows-list');
   if(!full){list.innerHTML='<div class="empty-state"><div class="es-icon">⚡</div><div class="es-sub">Select a repo</div></div>';return;}
@@ -4380,7 +4382,7 @@ async function markRead(id){
 
 async function markAllRead(){
   try{
-    await gh('PUT','/notifications',{read:true});
+    await gh('PUT','/notifications',{last_read_at:new Date().toISOString()});
     allNotifications.forEach(n=>n.unread=false);
     renderNotifications();
     const badge=document.getElementById('notif-badge');
@@ -4599,7 +4601,7 @@ async function saveTopics(){
   const raw=document.getElementById('set-topics').value;
   const names=raw.split(',').map(t=>t.trim().toLowerCase().replace(/[^a-z0-9-]/g,'')).filter(Boolean);
   try{
-    await gh('PUT','/repos/'+full+'/topics',{names},{'Accept':'application/vnd.github.mercy-preview+json'});
+    await gh('PUT','/repos/'+full+'/topics',{names});
     toast('Topics saved 🏷️','success');
   }catch(e){toast('Failed: '+e.message,'error');}
 }
