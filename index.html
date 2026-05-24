@@ -1844,8 +1844,32 @@ function updateRateLimit(rem,lim){
 }
 
 // ── AUTH ──────────────────────────────────────────────────────────
-function loadSavedToken(){try{return localStorage.getItem('gp-v7-token')||'';}catch{return '';}}
-function saveToken(tok){try{localStorage.setItem('gp-v7-token',tok);}catch{}}
+// ── ENCRYPTED TOKEN STORAGE (AES-GCM via WebCrypto) ──────────────
+async function _getEncKey(){
+  const raw=navigator.userAgent+screen.width+screen.height+screen.colorDepth+navigator.language;
+  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(raw));
+  return crypto.subtle.importKey('raw',buf,{name:'AES-GCM'},false,['encrypt','decrypt']);
+}
+async function saveToken(tok){
+  try{
+    if(!tok){localStorage.removeItem('gp-v7-token');return;}
+    const key=await _getEncKey();
+    const iv=crypto.getRandomValues(new Uint8Array(12));
+    const enc=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,new TextEncoder().encode(tok));
+    const payload=JSON.stringify({iv:Array.from(iv),data:Array.from(new Uint8Array(enc))});
+    localStorage.setItem('gp-v7-token',btoa(payload));
+  }catch{localStorage.removeItem('gp-v7-token');}
+}
+async function loadSavedToken(){
+  try{
+    const raw=localStorage.getItem('gp-v7-token');
+    if(!raw)return '';
+    const {iv,data}=JSON.parse(atob(raw));
+    const key=await _getEncKey();
+    const dec=await crypto.subtle.decrypt({name:'AES-GCM',iv:new Uint8Array(iv)},key,new Uint8Array(data));
+    return new TextDecoder().decode(dec);
+  }catch{localStorage.removeItem('gp-v7-token');return '';}
+}
 
 async function doConnect(){
   const tok=document.getElementById('pat').value.trim();
@@ -1858,7 +1882,7 @@ async function doConnect(){
   try{
     const u=await gh('GET','/user');
     S.user=u;
-    saveToken(tok);
+    await saveToken(tok);
     afterLogin();
   }catch(e){
     S.token='';
@@ -1888,7 +1912,7 @@ function afterLogin(){
 }
 
 async function tryAutoConnect(){
-  const tok=loadSavedToken();
+  const tok=await loadSavedToken();
   if(!tok) return;
   S.token=tok;
   try{
@@ -5313,3 +5337,4 @@ document.getElementById('sidebar').classList.add('hidden');
 </script>
 </body>
 </html>
+
