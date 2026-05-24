@@ -109,13 +109,19 @@
 **Actions trigger nahi ho raha**
 → Token mein `workflow` permission check karo
 
+**Token kaam nahi karta doosre browser mein**
+→ Security feature hai — token browser-specific encrypted hai, naya token enter karo
+
 ---
 
 ## 🔐 Security
 
-- Token sirf **tere browser** mein save hota hai (localStorage)
+- Token **AES-GCM encrypted** localStorage mein save hota hai — plain text nahi
+- Encryption key teri **browser fingerprint** se derive hoti hai (userAgent + screen + language)
+- Token **sirf usi browser** mein kaam karega jisme save kiya tha
 - Koi server nahi — sab directly **GitHub API** se
 - App completely **client-side** hai
+- Decrypt fail ho toh token **auto-clear** ho jaata hai
 
 ---
 
@@ -123,6 +129,7 @@
 
 - Pure HTML + CSS + JavaScript — koi framework nahi
 - GitHub REST API v3
+- Web Crypto API (AES-GCM token encryption)
 - PWA support (install as app)
 - highlight.js, marked.js, Chart.js, DOMPurify, JSZip
 
